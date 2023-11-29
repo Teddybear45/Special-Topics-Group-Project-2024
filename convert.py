@@ -78,12 +78,19 @@ def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple):
     for filename in os.listdir(input_dir):
         if filename.endswith('.txt'):
             txt_path = os.path.join(input_dir, filename)
-            mask_path = os.path.join(output_dir, filename.replace('.txt', '.jpg'))
+            mask_image_path = os.path.join(output_dir, filename.replace('.txt', '.jpg'))
+            mask_path = os.path.join(output_dir, filename.replace('.txt', '.npy'))
+
 
             polygon_points = get_polygon_coords(txt_path)
             mask = create_mask_image(polygon_points, mask_size)
-            
-            cv2.imwrite(mask_path, mask)
+
+            # for analysis when doing post processing
+            # save to numpy file
+            np.save(mask_path, mask)
+
+            # write to jpg
+            cv2.imwrite(mask_image_path, mask)
             counter += 1
             print("converted " + filename)
 
