@@ -1,5 +1,7 @@
 import os
+import shutil
 import random
+import time
 from PIL import Image
 from torchvision.transforms import functional as F
 from convert import mask_to_label_dir, label_to_mask_dir
@@ -26,24 +28,20 @@ def make_crops_dir(images_dir: str,
             image = F.to_tensor(image)
             mask = F.to_tensor(mask)
 
-            image_crops = F.ten_crop(image, 600)
-            mask_crops = F.ten_crop(mask, 600)
+            #TODO: make 640 pass in as param
+            image_crops = F.ten_crop(image, 640)
+            mask_crops = F.ten_crop(mask, 640)
 
             for i in range(10):
                 cropped_image_path = os.path.join(output_img_dir, filename[:-4] + str(i) + filename[-4:])
                 cropped_mask_path = os.path.join(output_mask_dir, filename[:-4] + str(i) + filename[-4:])
 
-
                 F.to_pil_image(image_crops[i]).save(cropped_image_path)
                 F.to_pil_image(mask_crops[i]).save(cropped_mask_path)
-                print("transformed " + image_path + "to " + cropped_image_path)
-                print("transformed " + mask_path + "to " + cropped_mask_path)
 
-make_crops_dir("./streetview.v3i.yolov5pytorch/valid/images", 
-               "./streetview.v3i.yolov5pytorch/valid/masks",
-               "./streetview.v3i.yolov5pytorch/valid/crop_images",
-               "./streetview.v3i.yolov5pytorch/valid/crop_masks"
-               )
+    print("used " + str(len(filenames)) + " images in " + images_dir + " to create " + str(len(filenames) * 10) + " cropped images in " + output_img_dir)
+    print("used " + str(len(filenames)) + " masks in " + masks_dir + " to create " + str(len(filenames) * 10) + " cropped masks in " + output_mask_dir)
+    print("")
 
 #applies random transforms to each image and mask in their respective folders
 def transform_dir(images_dir: str,
@@ -89,10 +87,131 @@ def transform_dir(images_dir: str,
 
             F.to_pil_image(image).save(augmented_image_path)
             F.to_pil_image(mask).save(augmented_mask_path)
-            print("transformed " + image_path + "to " + augmented_image_path)
-            print("transformed " + mask_path + "to " + augmented_mask_path)
+    print("applied random transforms to " + str(len(filenames)) + " images in " + images_dir + " and masks in " + masks_dir + " to " + output_img_dir + " and " + output_mask_dir)
+    print("")
 
 #preprocesses a dataset from start to end - converting the labels to masks, 10x the images with crops and applying random transforms, converting the transformed masks back to labels
 def prepare_dataset(input_filepath: str,
                     output_filepath: str):
-    pass
+    """
+    REQUIREMENTS:
+    image size of 640 (resulting images that go in model will have size of 600) todo make this changable
+    input file tree:
+    ├── data.yaml           # hyperparameters yaml file
+    └── train
+        └── images          # training images
+            ├── 01.png
+            └── 02.png
+        └── labels          # training labels
+            ├── 01.txt
+            └── 02.txt
+    └── valid
+        └── images          # validation images
+            ├── 03.png
+            └── 04.png
+        └── labels          # validation labels
+            ├── 03.txt
+            └── 04.txt
+    └── test 
+        └── images          # test images
+            ├── 05.png
+            └── 06.png
+        └── labels          # test labels
+            ├── 05.txt
+            └── 06.txt
+    """
+    #TODO: use for loops (for split in ["train", "valid", "test"]:)
+
+    #starts stopwatch
+    start = time.time()
+
+    #sets and checks for correct file tree
+    folders = os.listdir(input_filepath)
+    assert("train" in folders and "valid" in folders and "test" in folders and "data.yaml" in folders)
+    
+    os.makedirs(output_filepath, exist_ok=True)
+    shutil.copyfile(os.path.join(input_filepath, "data.yaml"), os.path.join(output_filepath, "data.yaml"))
+
+    #TODO: make 800 pass in as param
+    # creates the masks from labels
+    label_to_mask_dir(os.path.join(input_filepath, "train/labels"),
+                      os.path.join(output_filepath, "train/masks_og"), (800, 800), False)
+    
+    label_to_mask_dir(os.path.join(input_filepath, "valid/labels"),
+                      os.path.join(output_filepath, "valid/masks_og"), (800, 800), False)
+    
+    label_to_mask_dir(os.path.join(input_filepath, "test/labels"),
+                      os.path.join(output_filepath, "test/masks_og"), (800, 800), False)
+    
+    # copies the images over
+    shutil.copytree(os.path.join(input_filepath, "train/images"),
+                    os.path.join(output_filepath, "train/images_og"))
+    
+    shutil.copytree(os.path.join(input_filepath, "valid/images"),
+                    os.path.join(output_filepath, "valid/images_og"))
+    
+    shutil.copytree(os.path.join(input_filepath, "test/images"),
+                    os.path.join(output_filepath, "test/images_og"))
+    
+    # make crops
+    make_crops_dir(os.path.join(output_filepath, "train/images_og"),
+                   os.path.join(output_filepath, "train/masks_og"),
+                   os.path.join(output_filepath, "train/images_cropped"),
+                   os.path.join(output_filepath, "train/masks_cropped"))
+    
+    make_crops_dir(os.path.join(output_filepath, "valid/images_og"),
+                   os.path.join(output_filepath, "valid/masks_og"),
+                   os.path.join(output_filepath, "valid/images_cropped"),
+                   os.path.join(output_filepath, "valid/masks_cropped"))
+    
+    make_crops_dir(os.path.join(output_filepath, "test/images_og"),
+                   os.path.join(output_filepath, "test/masks_og"),
+                   os.path.join(output_filepath, "test/images_cropped"),
+                   os.path.join(output_filepath, "test/masks_cropped"))
+    
+    # applies random transforms
+    transform_dir(os.path.join(output_filepath, "train/images_cropped"),
+                  os.path.join(output_filepath, "train/masks_cropped"),
+                  os.path.join(output_filepath, "train/images"),
+                  os.path.join(output_filepath, "train/masks"))
+    
+    transform_dir(os.path.join(output_filepath, "valid/images_cropped"),
+                  os.path.join(output_filepath, "valid/masks_cropped"),
+                  os.path.join(output_filepath, "valid/images"),
+                  os.path.join(output_filepath, "valid/masks"))
+    
+    transform_dir(os.path.join(output_filepath, "test/images_cropped"),
+                  os.path.join(output_filepath, "test/masks_cropped"),
+                  os.path.join(output_filepath, "test/images"),
+                  os.path.join(output_filepath, "test/masks"))
+    
+    # converts labels back to masks
+    mask_to_label_dir(os.path.join(output_filepath, "train/masks"),
+                      os.path.join(output_filepath, "train/labels"))
+    
+    mask_to_label_dir(os.path.join(output_filepath, "valid/masks"),
+                      os.path.join(output_filepath, "valid/labels"))
+    
+    mask_to_label_dir(os.path.join(output_filepath, "test/masks"),
+                      os.path.join(output_filepath, "test/labels"))
+    
+    # cleanup
+    shutil.rmtree(os.path.join(output_filepath, "train/images_cropped"))
+    shutil.rmtree(os.path.join(output_filepath, "train/images_og"))
+    shutil.rmtree(os.path.join(output_filepath, "train/masks_cropped"))
+    shutil.rmtree(os.path.join(output_filepath, "train/masks_og"))
+    shutil.rmtree(os.path.join(output_filepath, "valid/images_cropped"))
+    shutil.rmtree(os.path.join(output_filepath, "valid/images_og"))
+    shutil.rmtree(os.path.join(output_filepath, "valid/masks_cropped"))
+    shutil.rmtree(os.path.join(output_filepath, "valid/masks_og"))
+    shutil.rmtree(os.path.join(output_filepath, "test/images_cropped"))
+    shutil.rmtree(os.path.join(output_filepath, "test/images_og"))
+    shutil.rmtree(os.path.join(output_filepath, "test/masks_cropped"))
+    shutil.rmtree(os.path.join(output_filepath, "test/masks_og"))
+
+    #ends stopwatch, returns time taken in hours
+    end = time.time()
+    return round((end-start)/3600, 3)
+
+if __name__ == "__main__":
+    print(prepare_dataset("./TOY", "./TOY_RESULT"))

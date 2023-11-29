@@ -35,11 +35,10 @@ def mask_to_label_dir(input_dir: str, output_dir: str):
             mask_image_path = os.path.join(input_dir, mask_filename)
             label_txt_path = os.path.join(output_dir, mask_filename.replace('.jpg', '.txt'))
             mask_to_label(mask_image_path, label_txt_path, 0)
-            print("converted " + mask_filename)
             counter += 1
-            
+
+    print("converted " + str(len([i.endswith("jpg") for i in os.listdir(input_dir)])) + " labels in " + input_dir + " to masks in " + output_dir)
     print("")
-    print("converted " + str(counter) + " masks in " + input_dir + " to labels in " + output_dir)
 
 
 #converts the yolov5 label to a list of polygon coords
@@ -71,28 +70,28 @@ def create_mask_image(polygon_coords: list, mask_size: tuple):
     return mask
 
 #converts a folder of yolov5 labels to binary masks
-def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple):
+def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple, as_numpy: bool):
     os.makedirs(output_dir, exist_ok=True)
     counter = 0
 
     for filename in os.listdir(input_dir):
         if filename.endswith('.txt'):
             txt_path = os.path.join(input_dir, filename)
-            mask_image_path = os.path.join(output_dir, filename.replace('.txt', '.jpg'))
-            mask_path = os.path.join(output_dir, filename.replace('.txt', '.npy'))
-
 
             polygon_points = get_polygon_coords(txt_path)
             mask = create_mask_image(polygon_points, mask_size)
+            
+            if as_numpy:
+                # for analysis when doing post processing
+                # save to numpy file
+                mask_path = os.path.join(output_dir, filename.replace('.txt', '.npy'))
+                np.save(mask_path, mask)
 
-            # for analysis when doing post processing
-            # save to numpy file
-            np.save(mask_path, mask)
-
-            # write to jpg
-            cv2.imwrite(mask_image_path, mask)
-            counter += 1
-            print("converted " + filename)
-
+            else:
+                # write to jpg
+                mask_path = os.path.join(output_dir, filename.replace('.txt', '.jpg'))
+                cv2.imwrite(mask_path, mask)
+            
+    #TODO: figure out why -1 in length
+    print("converted " + str(len([i.endswith(".txt") for i in os.listdir(input_dir)]) - 1) + " labels in " + input_dir + " to masks in " + output_dir)
     print("")
-    print("converted " + str(counter) + " labels in " + input_dir + " to masks in " + output_dir)
