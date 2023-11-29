@@ -9,16 +9,21 @@ def mask_to_label(mask_path: str, label_path: str, class_id: int):
 
     # find contours in the mask image
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contour = max(contours, key=cv2.contourArea)
-    with open(label_path, 'w') as label_file:
-        # convert contour to polygon format
-        polygon_points = contour.reshape(-1, 2)
-        normalized_polygon = [(x / mask.shape[1], y / mask.shape[0]) for x, y in polygon_points]
-    
+    if len(contours) > 0:
+        contour = max(contours, key=cv2.contourArea)
+        with open(label_path, 'w') as label_file:
+            # convert contour to polygon format
+            polygon_points = contour.reshape(-1, 2)
+            normalized_polygon = [(x / mask.shape[1], y / mask.shape[0]) for x, y in polygon_points]
+        
+            # writes the coordinates to label txt file
+            label_file.write(f"{class_id} ")
+            for x, y in normalized_polygon:
+                label_file.write(f"{x} {y} ")
+    else:
         # writes the coordinates to label txt file
-        label_file.write(f"{class_id} ")
-        for x, y in normalized_polygon:
-            label_file.write(f"{x} {y} ")
+        with open(label_path, 'w') as label_file:
+            label_file.write(f"{class_id} ")
 
 #converts a folder of binary masks to yolov5 label format
 def mask_to_label_dir(input_dir: str, output_dir: str):
@@ -65,6 +70,7 @@ def create_mask_image(polygon_coords: list, mask_size: tuple):
     
     return mask
 
+#converts a folder of yolov5 labels to binary masks
 def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple):
     os.makedirs(output_dir, exist_ok=True)
     counter = 0
@@ -83,4 +89,3 @@ def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple):
 
     print("")
     print("converted " + str(counter) + " labels in " + input_dir + " to masks in " + output_dir)
-
