@@ -7,30 +7,34 @@ import numpy as np
 # input: path to a folder of binary masks, output folder path
 # output: none; folder of binary masks with small islands removed
 
-def remove_small_islands(input_dir: str, output_dir: str):
+def remove_small_islands(input_dir: str, output_dir: str, as_numpy=False):
     os.makedirs(output_dir, exist_ok=True)
 
     for mask_filename in os.listdir(input_dir):
-        # open the npy mask image (should be of size NxM) todo, if not make helper function to flattent out rgb
-        mask_image_path = os.path.join(input_dir, mask_filename)
+        if mask_filename.endswith(".npy"):
+            # open the npy mask image (should be of size NxM) todo, if not make helper function to flattent out rgb
+            mask_image_path = os.path.join(input_dir, mask_filename)
 
-        mask = np.load(mask_image_path)
+            mask = np.load(mask_image_path)
 
-        mask = np.uint8(mask)
+            mask = np.uint8(mask)
 
-        # get rid of small islands using cv2's connected components
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=4)
+            # get rid of small islands using cv2's connected components
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=4)
 
-        # only keep the biggest island
-        biggest_island_idx = np.argmax(stats[1:, 4]) + 1
-        mask[labels != biggest_island_idx] = 0
+            # only keep the biggest island
+            biggest_island_idx = np.argmax(stats[1:, 4]) + 1
+            mask[labels != biggest_island_idx] = 0
 
-        # save the processed mask
-        processed_mask_path = os.path.join(output_dir, mask_filename)
-
-        np.save(processed_mask_path, mask)
-
-        return mask
+            if as_numpy:
+                # for analysis when doing post processing
+                # save to numpy file
+                processed_mask_path = os.path.join(output_dir, mask_filename)
+                np.save(processed_mask_path, mask)
+            else:
+                # write to jpg
+                processed_mask_path = os.path.join(output_dir, mask_filename.replace('.npy', '.jpg'))
+                cv2.imwrite(processed_mask_path, mask)
 
 if __name__ == '__main__':
     # a tester 2d binary matrix of size MxN

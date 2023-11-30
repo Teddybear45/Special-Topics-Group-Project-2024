@@ -3,12 +3,15 @@ import os
 import shutil
 import time
 from preprocess import prepare_dataset
+from convert import create_mask_image, label_to_mask_dir
+from postprocessing import remove_small_islands
+import numpy as np
 
 def train(model: YOLO,                          # model to train
           folder: str,                          # filepath to the folder of the run, containing just the dataset in folder named "dataset"
           num_epochs: int,                      # number of epochs to train for
           batch_size: int,                      # batch size
-          run_testing=True):                    # if true, runs teseting, if not, skip
+          run_eval=True):                    # if true, runs teseting, if not, skip
     
     # PREPROCESSING
 
@@ -72,16 +75,48 @@ def train(model: YOLO,                          # model to train
         
     #EVALULATION
 
-    if run_testing:
+    if run_eval and "evaluation" not in os.listdir(folder):
         print("")
-        print("!!! STARTING TESTING !!!")
+        print("!!! STARTING EVALUATION !!!")
         print("")
-        test_results = trained_model(os.path.join(folder, "prepared_dataset/test/images"), save=True)
-        shutil.copytree("./runs/segment/predict", os.path.join(folder, "test_visualization"))
+        test_results = trained_model(os.path.join(folder, "prepared_dataset/test/images"), save=True, max_det=1)
+
+        shutil.copytree("./runs/segment/predict", os.path.join(folder, "evaluation/visualization"))
         shutil.rmtree("./runs/segment/predict")
+
+        predicted_label_path = os.path.join(folder, "evaluation/predicted_labels")
+        os.mkdir(os.path.join(predicted_label_path))
+
+        for result in test_results:
+            ultralytics_mask = result.masks
+            coords = ultralytics_mask.xyn
+
+            #TODO: probably make the rest of this for loop into a helper function for readability
+            coords = np.array(coords)[0]
+            flattened_coords = [0] #class index for label format
+
+            for pair in coords:
+                for value in pair:
+                    flattened_coords.append(value)
+
+            formatted_string = ' '.join(map(str, flattened_coords))
+            
+            label_path = result.path
+            label_path = label_path.replace("prepared_dataset/test/images", "evaluation/predicted_labels")
+            label_path = label_path.replace('.jpg', '.txt')
+
+            with open(label_path, 'w') as label_file:
+                label_file.write(formatted_string)
+
+        label_to_mask_dir(os.path.join(folder, "evaluation/predicted_labels"), os.path.join(folder, "evaluation/predicted_nps_prepost"), (640, 640), True)
+
+        remove_small_islands(os.path.join(folder, "evaluation/predicted_nps_prepost"), os.path.join(folder, "evaluation/predicted_masks"), False)
+
     else:
         print("")
-        print("!!! FINISHED WITHOUT TESTING !!!")
+        print("!!! FINISHED WITHOUT EVALUATION !!!")
         print("")
-        
-    shutil.rmtree("./runs")
+
+    # final check for cleanup
+    if "runs" in os.listdir("./"):
+        shutil.rmtree("./runs")

@@ -95,3 +95,6 @@ def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple, as_nump
     #TODO: figure out why -1 in length
     print("converted " + str(len([i.endswith(".txt") for i in os.listdir(input_dir)]) - 1) + " labels in " + input_dir + " to masks in " + output_dir)
     print("")
+
+if __name__ == "__main__":
+    print(get_polygon_coords("/Users/nathansun/Documents/Special-Topics-Group-Project-2024/TOY/test/labels/08.txt"))
