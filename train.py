@@ -15,8 +15,8 @@ def train(model: YOLO,                          # model to train
     
     # PREPROCESSING
 
+    #no prepared dataset given
     if "prepared_dataset" not in os.listdir(folder):
-
         print("")
         print("!!! STARTING PREPROCESSING !!!")
         print("")
@@ -29,8 +29,8 @@ def train(model: YOLO,                          # model to train
         print("")
         print("finished preprocessing in " + str(preprocessing_time) + " hours")
 
+    #given prepared dataset
     else:
-
         print("")
         print("!!!  USING PROVIDED PREPROCESSED DATASET !!!")
         print("")
@@ -42,9 +42,9 @@ def train(model: YOLO,                          # model to train
     # cleans up from past runs
     if "runs" in os.listdir("./"):
         shutil.rmtree("./runs")
-        
+    
+    #no folder of weights or weights folder doesnt have best.pt
     if "weights" not in os.listdir(folder) or "best.pt" not in os.listdir(os.path.join(folder, "weights")):
-
         print("")
         print("!!! STARTING TRAINING !!!")
         print("")
@@ -64,9 +64,11 @@ def train(model: YOLO,                          # model to train
 
         # ends stopwatch
         train_end = time.time()
+
         print("")
         print("finished training in " + str(round((train_end - train_start) / 3600, 3)) + " hours")
 
+    #folder/weghts/best.pt already exists
     else:
         print("")
         print("!!! USING PROVIDED TRAINED MODEL !!!")
@@ -75,23 +77,31 @@ def train(model: YOLO,                          # model to train
         
     #EVALULATION
 
+    #we want to run eval and there is no eval folder already there
     if run_eval and "evaluation" not in os.listdir(folder):
         print("")
         print("!!! STARTING EVALUATION !!!")
         print("")
+
+        #runs prediction with model
         test_results = trained_model(os.path.join(folder, "prepared_dataset/test/images"), save=True, max_det=1)
 
+        #moves model results to our folder
         shutil.copytree("./runs/segment/predict", os.path.join(folder, "evaluation/visualization"))
         shutil.rmtree("./runs/segment/predict")
 
+        #creates folder to put the labels in
         predicted_label_path = os.path.join(folder, "evaluation/predicted_labels")
         os.mkdir(os.path.join(predicted_label_path))
 
         for result in test_results:
+            #get normalized xy coordinates from results object
             ultralytics_mask = result.masks
             coords = ultralytics_mask.xyn
 
             #TODO: probably make the rest of this for loop into a helper function for readability
+
+            # get first and only prediction, adds to flattened list
             coords = np.array(coords)[0]
             flattened_coords = [0] #class index for label format
 
@@ -99,17 +109,22 @@ def train(model: YOLO,                          # model to train
                 for value in pair:
                     flattened_coords.append(value)
 
+            #converts to string
             formatted_string = ' '.join(map(str, flattened_coords))
             
+            #gets location to put label
             label_path = result.path
             label_path = label_path.replace("prepared_dataset/test/images", "evaluation/predicted_labels")
             label_path = label_path.replace('.jpg', '.txt')
 
+            #writes string to label txt
             with open(label_path, 'w') as label_file:
                 label_file.write(formatted_string)
 
+        #converts folder of labels to masks
         label_to_mask_dir(os.path.join(folder, "evaluation/predicted_labels"), os.path.join(folder, "evaluation/predicted_nps_prepost"), (640, 640), True)
 
+        #postprocessing
         remove_small_islands(os.path.join(folder, "evaluation/predicted_nps_prepost"), os.path.join(folder, "evaluation/predicted_masks"), False)
 
     else:
