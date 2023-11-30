@@ -2,10 +2,12 @@ from ultralytics import YOLO
 import os
 import shutil
 import time
+import numpy as np
+import matplotlib.pyplot as plt
 from preprocess import prepare_dataset
 from convert import create_mask_image, label_to_mask_dir
 from postprocessing import remove_small_islands
-import numpy as np
+from metrics import get_pixel_accuracy_of_dirs
 
 def train(model: YOLO,                          # model to train
           folder: str,                          # filepath to the folder of the run, containing just the dataset in folder named "dataset"
@@ -122,11 +124,28 @@ def train(model: YOLO,                          # model to train
                 label_file.write(formatted_string)
 
         #converts folder of labels to masks
+        print("")
         label_to_mask_dir(os.path.join(folder, "evaluation/predicted_labels"), os.path.join(folder, "evaluation/predicted_nps_prepost"), (640, 640), True)
-
+        
         #postprocessing
+        print("")
         remove_small_islands(os.path.join(folder, "evaluation/predicted_nps_prepost"), os.path.join(folder, "evaluation/predicted_masks"), False)
 
+        #calculate score
+        accuracies = get_pixel_accuracy_of_dirs(os.path.join(folder, "evaluation/predicted_masks"), os.path.join(folder, "prepared_dataset/test/masks"))
+        score = 100 * np.average(accuracies)
+
+        os.mkdir(os.path.join(folder, "evaluation/accuracies"))
+
+        #makes plot
+        plt.scatter(range(len(accuracies)), accuracies)
+        plt.savefig(os.path.join(folder, "evaluation/accuracies/plot.png"))
+
+        print("")
+        print("!!! FINAL SCORE OF MODEL " + str(round(score, 3)) + "% !!!")
+
+        #cleanup
+        shutil.rmtree(os.path.join(folder, "evaluation/predicted_nps_prepost"))
     else:
         print("")
         print("!!! FINISHED WITHOUT EVALUATION !!!")

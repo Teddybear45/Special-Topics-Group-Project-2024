@@ -35,6 +35,7 @@ def remove_small_islands(input_dir: str, output_dir: str, as_numpy=False):
                 # write to jpg
                 processed_mask_path = os.path.join(output_dir, mask_filename.replace('.npy', '.jpg'))
                 cv2.imwrite(processed_mask_path, mask)
+    print("finished postprocessing")
 
 if __name__ == '__main__':
     # a tester 2d binary matrix of size MxN
