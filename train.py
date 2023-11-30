@@ -13,7 +13,8 @@ def train(model: YOLO,                          # model to train
           folder: str,                          # filepath to the folder of the run, containing just the dataset in folder named "dataset"
           num_epochs: int,                      # number of epochs to train for
           batch_size: int,                      # batch size
-          run_eval=True):                    # if true, runs teseting, if not, skip
+          run_training=True,                    # if true and theres no weights present, runs training
+          run_eval=True):                       # if true and theres no eval folder present, runs teseting
     
     # PREPROCESSING
 
@@ -45,8 +46,8 @@ def train(model: YOLO,                          # model to train
     if "runs" in os.listdir("./"):
         shutil.rmtree("./runs")
     
-    #no folder of weights or weights folder doesnt have best.pt
-    if "weights" not in os.listdir(folder) or "best.pt" not in os.listdir(os.path.join(folder, "weights")):
+    #not skipping training and no folder of weights or weights folder doesnt have best.pt
+    if run_training and ("weights" not in os.listdir(folder) or "best.pt" not in os.listdir(os.path.join(folder, "weights"))):
         print("")
         print("!!! STARTING TRAINING !!!")
         print("")
@@ -73,9 +74,13 @@ def train(model: YOLO,                          # model to train
     #folder/weghts/best.pt already exists
     else:
         print("")
-        print("!!! USING PROVIDED TRAINED MODEL !!!")
+        print("!!! SKIPPED TRAINING OR USING PROVIDED TRAINED MODEL !!!")
         print("")
-        trained_model = YOLO(os.path.join(folder, "weights/best.pt"))
+        if ("weights" in os.listdir(folder) and "best.pt" in os.listdir(os.path.join(folder, "weights"))):
+            trained_model = YOLO(os.path.join(folder, "weights/best.pt"))
+        else:
+            print("NO WEIGHTS GIVEN AND SKIPPED TRAINING, ALSO SKIPPING EVAL")
+            run_eval = False
         
     #EVALULATION
 
