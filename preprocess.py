@@ -133,6 +133,7 @@ def prepare_dataset(input_filepath: str,
     shutil.copyfile(os.path.join(input_filepath, "data.yaml"), os.path.join(output_filepath, "data.yaml"))
 
     #TODO: make 800 pass in as param
+    
     # creates the masks from labels
     label_to_mask_dir(os.path.join(input_filepath, "train/labels"),
                       os.path.join(output_filepath, "train/masks_og"), (800, 800), False)
