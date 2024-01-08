@@ -37,6 +37,11 @@ def remove_small_islands(input_dir: str, output_dir: str, as_numpy=False):
                 cv2.imwrite(processed_mask_path, mask)
     print("finished postprocessing")
 
+def only_edges(input_str: str,
+               output_str: str,
+               edges_width: int):
+    pass
+
 if __name__ == '__main__':
     # a tester 2d binary matrix of size MxN
     test_2d_arr = np.random.randint(2, size=(1000, 1000))
