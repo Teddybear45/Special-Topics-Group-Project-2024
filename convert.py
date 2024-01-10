@@ -61,13 +61,28 @@ def get_polygon_coords(label_path: str):
 def create_mask_image(polygon_coords: list, mask_size: tuple):
     # creates empty mask array
     mask = np.zeros(mask_size, dtype=np.uint8)
-
-    for class_idx, coords in polygon_coords:
-        pts = np.array(coords)
-        unnormalized_pts = (pts * np.array(mask_size[::-1])).astype(int)  # reverse mask_size for (height, width)
-        cv2.fillPoly(mask, [unnormalized_pts], 255)
-    
+    if not polygon_coords[0] == (0, []):
+        for class_idx, coords in polygon_coords:
+            pts = np.array(coords)
+            unnormalized_pts = (pts * np.array(mask_size[::-1])).astype(int)  # reverse mask_size for (height, width)
+            cv2.fillPoly(mask, [unnormalized_pts], 255)
     return mask
+
+def label_to_mask(label_path: str, mask_path: str, mask_size: tuple, as_numpy: bool):
+    if label_path.endswith('.txt'):
+        filename = os.path.basename(label_path)
+
+        polygon_points = get_polygon_coords(label_path)
+        mask = create_mask_image(polygon_points, mask_size)
+        
+        if as_numpy:
+            # for analysis when doing post processing
+            # save to numpy file
+            np.save(mask_path, mask)
+
+        else:
+            # write to jpg
+            cv2.imwrite(mask_path, mask)
 
 #converts a folder of yolov5 labels to binary masks
 def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple, as_numpy: bool):
@@ -96,5 +111,54 @@ def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple, as_nump
     print("converted " + str(len([i.endswith(".txt") for i in os.listdir(input_dir)]) - 1) + " labels in " + input_dir + " to masks in " + output_dir)
     print("")
 
+def video_to_frames(video_path: str, output_dir: str, fps: int):
+    
+    # open the video file
+    cap = cv2.VideoCapture(video_path)
+
+    # create output folder if it doesn't exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # get video properties
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    # calculate the interval between frames based on the desired fps
+    frame_interval = int(cap.get(cv2.CAP_PROP_FPS) / fps)
+
+    # start extracting frames
+    frame_count = 0
+    while True:
+        ret, frame = cap.read()
+
+        if not ret:
+            break
+
+        # save frame if it's within the specified interval
+        if frame_count % frame_interval == 0:
+            frame_filename = os.path.join(output_dir, f"frame_{frame_count // frame_interval:04d}.png")
+            cv2.imwrite(frame_filename, frame)
+
+        frame_count += 1
+
+def frames_to_video(images_dir: str, output_video_path: str, fps: int):
+    image_files = os.listdir(images_dir)
+    image_files.sort()
+
+    # use the first image to get dimensions
+    first_image = cv2.imread(os.path.join(images_dir, image_files[0]))
+    height, width, _ = first_image.shape
+
+    # define codec and create VideoWriter object
+    fourcc = cv2.VideoWriter_fourcc(*'avc1')
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+
+    for i in image_files:
+        frame = cv2.imread(os.path.join(images_dir, i))
+        out.write(frame)
+
+    
 if __name__ == "__main__":
-    print(get_polygon_coords("/Users/nathansun/Documents/Special-Topics-Group-Project-2024/TOY/test/labels/08.txt"))
+    print(get_polygon_coords("/Users/nathansun/Documents/Special-Topics-Group-Project-2024/emptytest.txt"))
