@@ -124,17 +124,15 @@ def predict_video(model: YOLO, # must be absolute path, idk why
     os.makedirs(os.path.join(result_path, "frames/"), exist_ok=True)
     os.makedirs(os.path.join(result_path, "perframeruns/"), exist_ok=True)
 
+    os.makedirs(os.path.join(result_path, "framefolders/originals"), exist_ok=True)
     os.makedirs(os.path.join(result_path, "framefolders/masks"), exist_ok=True)
     os.makedirs(os.path.join(result_path, "framefolders/edges"), exist_ok=True)
     os.makedirs(os.path.join(result_path, "framefolders/overlays"), exist_ok=True)
-    shutil.copyfile(video_path, os.path.join(result_path, "original.mp4"))
-    
-    video_to_frames(os.path.join(result_path, "original.mp4"), os.path.join(result_path, "frames/"), fps)
+
+    video_to_frames(video_path, os.path.join(result_path, "frames/"), fps)
 
     frames_dir_list = os.listdir(os.path.join(result_path, "frames/"))
     frames_dir_list.sort()
-
-
 
     for i in frames_dir_list:
         predict_image(model,
@@ -144,6 +142,8 @@ def predict_video(model: YOLO, # must be absolute path, idk why
                       overlay_edges,
                       rgba)
         
+        shutil.copy(os.path.join(result_path, "perframeruns", i.replace(".png", ""), "original.jpg"),
+                    os.path.join(result_path, "framefolders/originals", i.replace(".png", ".jpg")))
         shutil.copy(os.path.join(result_path, "perframeruns", i.replace(".png", ""), "mask.jpg"),
                     os.path.join(result_path, "framefolders/masks", i.replace(".png", ".jpg")))
         shutil.copy(os.path.join(result_path, "perframeruns", i.replace(".png", ""), "edges.jpg"),
@@ -151,10 +151,13 @@ def predict_video(model: YOLO, # must be absolute path, idk why
         shutil.copy(os.path.join(result_path, "perframeruns", i.replace(".png", ""), "overlay.jpg"),
                     os.path.join(result_path, "framefolders/overlays", i.replace(".png", ".jpg")))
 
+    frames_to_video(os.path.join(result_path, "framefolders/originals"), os.path.join(result_path, "original.mp4"), fps)
     frames_to_video(os.path.join(result_path, "framefolders/masks"), os.path.join(result_path, "mask.mp4"), fps)
     frames_to_video(os.path.join(result_path, "framefolders/edges"), os.path.join(result_path, "edges.mp4"), fps)
     frames_to_video(os.path.join(result_path, "framefolders/overlays"), os.path.join(result_path, "overlay.mp4"), fps)
 
+    #adjust original video framerate to match
+    
     #cleanup
     shutil.rmtree(os.path.join(result_path, "framefolders"))
     shutil.rmtree(os.path.join(result_path, "frames"))

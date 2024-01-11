@@ -26,22 +26,25 @@
 
 import os
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, simpledialog
 import cv2
 from PIL import Image, ImageTk
 import threading
 import time
+import datetime
 import tkinter as tk
+from ultralytics import YOLO
+from predict import predict_image, predict_video
 
 
 class VideoPlayer:
-    def __init__(self, canvas, video_path, frame_delay=30):
+    def __init__(self, canvas, video_path, fps=5):
         self.canvas = canvas
         self.video_path = video_path
         self.cap = cv2.VideoCapture(video_path)
         self.thread = threading.Thread(target=self.update, daemon=True)
         self.is_playing = False
-        self.frame_delay = frame_delay  # Set the frame delay in milliseconds
+        self.frame_delay = 1.0/fps  # Set the frame delay in milliseconds
 
     def start(self):
         self.is_playing = True
@@ -58,7 +61,7 @@ class VideoPlayer:
                 image_path = self.save_temp_image(frame)
                 self.show_frame(image_path)
                 # Add a delay between frames (frame_delay is in milliseconds)
-                time.sleep(self.frame_delay / 1000)
+                time.sleep(self.frame_delay)
             else:
                 # self.is_playing = False
 
@@ -67,7 +70,7 @@ class VideoPlayer:
 
     def save_temp_image(self, image):
         temp_path = "temp_image.jpg"
-        cv2.imwrite(temp_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(temp_path, cv2.cvtColor(image, 0))
         return temp_path
 
     def show_frame(self, image_path):
@@ -94,18 +97,48 @@ class ImageVideoViewer:
         self.root.geometry("800x600")
 
         self.folder_path = tk.StringVar()
-        self.image_type = tk.StringVar(value="image")
+        self.image_type = "image"
         self.selected_image_type = tk.StringVar(value="original")
+        
+        self.model = YOLO("/Users/nathansun/Documents/Special-Topics-Group-Project-2024/best.pt")
+        self.fps = tk.IntVar(self.root, 5)
+        self.r = tk.IntVar(self.root, 255)
+        self.g = tk.IntVar(self.root, 100)
+        self.b = tk.IntVar(self.root, 100)
+        self.alpha = tk.IntVar(self.root, 100)
 
         # GUI Components
-        tk.Label(self.root, text="Select Folder:").pack(pady=10)
+        tk.Label(self.root, text="Select FPS:").pack(pady=10)
+
+        fps_entry = tk.Entry(self.root, textvariable=self.fps, state='disabled', width=10)
+        fps_entry.pack(pady=5)
+
+        tk.Button(self.root, text="Set FPS", command=self.set_fps).pack(pady=10)
+
+        r_entry = tk.Entry(self.root, textvariable=self.r, state='disabled', width=10)
+        r_entry.pack(pady=5)
+
+        g_entry = tk.Entry(self.root, textvariable=self.g, state='disabled', width=10)
+        g_entry.pack(pady=5)
+
+        b_entry = tk.Entry(self.root, textvariable=self.b, state='disabled', width=10)
+        b_entry.pack(pady=5)
+
+        alpha_entry = tk.Entry(self.root, textvariable=self.alpha, state='disabled', width=10)
+        alpha_entry.pack(pady=5)
+
+        tk.Button(self.root, text="Set Overlay RGBA", command=self.set_rgba).pack(pady=10)
+
+        tk.Label(self.root, text="Select File:").pack(pady=10)
+
         entry_folder = tk.Entry(self.root, textvariable=self.folder_path, state='disabled', width=50)
         entry_folder.pack(pady=5)
+
         tk.Button(self.root, text="Browse", command=self.browse_folder).pack(pady=10)
 
-        tk.Label(self.root, text="Select Type:").pack(pady=10)
-        tk.Radiobutton(self.root, text="Image", variable=self.image_type, value="image", command=self.update_view).pack()
-        tk.Radiobutton(self.root, text="Video", variable=self.image_type, value="video", command=self.update_view).pack()
+        #tk.Label(self.root, text="Select Type:").pack(pady=10)
+        #tk.Radiobutton(self.root, text="Image", variable=self.image_type, value="image", command=self.update_view).pack()
+        #tk.Radiobutton(self.root, text="Video", variable=self.image_type, value="video", command=self.update_view).pack()
 
         tk.Label(self.root, text="Select Image/Video:").pack(pady=10)
         tk.Radiobutton(self.root, text="Original", variable=self.selected_image_type, value="original",
@@ -131,18 +164,48 @@ class ImageVideoViewer:
         self.temp_image_path = None  # Track the temporary image path
 
     def browse_folder(self):
-        folder_selected = filedialog.askdirectory()
-        if folder_selected:
-            self.folder_path.set(folder_selected)
+        og_file = filedialog.askopenfilename()
+        if og_file:
+            current_time = datetime.datetime.now()
+            #TODO: definetely better way to do this lol
+            run_name = str(current_time.year) + str(current_time.month) + str(current_time.day) + str(current_time.hour) + str(current_time.minute) + str(current_time.second)
+            os.makedirs(os.path.join("./cache/runs", run_name))
+            #TODO: make params changable
+            if og_file.endswith(".jpg"):
+                predict_image(self.model, og_file, os.path.join("./cache/runs", run_name), 30, False, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()))
+                self.image_type = "image"
+            elif og_file.endswith(".mp4"):
+                predict_video(self.model, og_file, os.path.join("./cache/runs", run_name), 30, False, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()), self.fps.get())
+                self.image_type = "video"
+        
+            self.folder_path.set(os.path.join("./cache/runs", run_name))
             self.update_view()
+
+    def set_fps(self):
+        chosen_fps = simpledialog.askinteger("FPS Entry", "Enter FPS")
+        self.fps.set(chosen_fps)
+
+    def set_rgba(self):
+        chosen_r = simpledialog.askinteger("RGBA Entry", "Enter Red value (0 - 255)")
+        self.r.set(chosen_r)
+        chosen_g = simpledialog.askinteger("RGBA Entry", "Enter Green value (0 - 255)")
+        self.g.set(chosen_g)
+        chosen_b = simpledialog.askinteger("RGBA Entry", "Enter Blue value (0 - 255)")
+        self.b.set(chosen_b)
+        chosen_a = simpledialog.askinteger("RGBA Entry", "Enter Alpha value (0 - 255)")
+        self.alpha.set(chosen_a)
 
     def update_view(self):
         folder_path = self.folder_path.get()
-
+        fps = self.fps.get()
+        r = self.r.get()
+        g = self.g.get()
+        b = self.b.get()
+        alpha = self.alpha.get()
         if not folder_path:
             return
 
-        image_type = self.image_type.get()
+        image_type = self.image_type
         selected_type = self.selected_image_type.get()
 
         if image_type == "image":
@@ -168,7 +231,7 @@ class ImageVideoViewer:
             if hasattr(self, "video_player") and self.video_player.is_playing:
                 self.video_player.stop()
 
-            self.video_player = VideoPlayer(self.canvas, video_path, frame_delay=1)
+            self.video_player = VideoPlayer(self.canvas, video_path, fps=fps)
             self.video_player.start()
             return
 
