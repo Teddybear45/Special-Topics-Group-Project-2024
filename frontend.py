@@ -1,4 +1,3 @@
-import tkinter as tk
 
 
 # Premise
@@ -31,15 +30,18 @@ from tkinter import ttk, filedialog
 import cv2
 from PIL import Image, ImageTk
 import threading
+import time
+import tkinter as tk
 
 
 class VideoPlayer:
-    def __init__(self, canvas, video_path):
+    def __init__(self, canvas, video_path, frame_delay=30):
         self.canvas = canvas
         self.video_path = video_path
         self.cap = cv2.VideoCapture(video_path)
         self.thread = threading.Thread(target=self.update, daemon=True)
         self.is_playing = False
+        self.frame_delay = frame_delay  # Set the frame delay in milliseconds
 
     def start(self):
         self.is_playing = True
@@ -55,6 +57,8 @@ class VideoPlayer:
             if ret:
                 image_path = self.save_temp_image(frame)
                 self.show_frame(image_path)
+                # Add a delay between frames (frame_delay is in milliseconds)
+                time.sleep(self.frame_delay / 1000)
             else:
                 self.is_playing = False
 
@@ -69,7 +73,6 @@ class VideoPlayer:
         self.canvas.config(scrollregion=self.canvas.bbox("all"), width=img.width(), height=img.height())
         self.canvas.create_image(0, 0, anchor='nw', image=img)
         self.canvas.image = img
-
 
 class ImageVideoViewer:
     def __init__(self, root):
@@ -152,24 +155,11 @@ class ImageVideoViewer:
             if hasattr(self, "video_player") and self.video_player.is_playing:
                 self.video_player.stop()
 
-            self.video_player = VideoPlayer(self.canvas, video_path)
+            self.video_player = VideoPlayer(self.canvas, video_path, frame_delay=20)
             self.video_player.start()
             return
 
         self.show_image(image_path)
-
-    def play_video(self, cap):
-        ret, frame = cap.read()
-        if ret:
-            # Update and display the video frame
-            image_path = self.save_temp_image(frame)
-            self.show_image(image_path)
-
-            # Schedule the next frame update after a delay (e.g., 30 milliseconds)
-            self.root.after(30, lambda: self.play_video(cap))
-        else:
-            # Release the video capture object when the video ends
-            cap.release()
 
     def reset_view(self):
         self.folder_path.set("")
@@ -198,5 +188,6 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = ImageVideoViewer(root)
     root.mainloop()
+
 
 
