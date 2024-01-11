@@ -96,6 +96,7 @@ class ImageVideoViewer:
         self.root.title("Image/Video Viewer")
         self.root.geometry("800x600")
 
+        self.file_path = tk.StringVar()
         self.folder_path = tk.StringVar()
         self.image_type = "image"
         self.selected_image_type = tk.StringVar(value="original")
@@ -106,6 +107,7 @@ class ImageVideoViewer:
         self.g = tk.IntVar(self.root, 100)
         self.b = tk.IntVar(self.root, 100)
         self.alpha = tk.IntVar(self.root, 100)
+        self.rgba = tk.StringVar(value=", ".join(str(i) for i in [self.r.get(), self.g.get(), self.b.get(), self.alpha.get()]))
 
         # GUI Components
         tk.Label(self.root, text="Select FPS:").pack(pady=10)
@@ -115,32 +117,20 @@ class ImageVideoViewer:
 
         tk.Button(self.root, text="Set FPS", command=self.set_fps).pack(pady=10)
 
-        r_entry = tk.Entry(self.root, textvariable=self.r, state='disabled', width=10)
-        r_entry.pack(pady=5)
-
-        g_entry = tk.Entry(self.root, textvariable=self.g, state='disabled', width=10)
-        g_entry.pack(pady=5)
-
-        b_entry = tk.Entry(self.root, textvariable=self.b, state='disabled', width=10)
-        b_entry.pack(pady=5)
-
-        alpha_entry = tk.Entry(self.root, textvariable=self.alpha, state='disabled', width=10)
-        alpha_entry.pack(pady=5)
+        rgba_entry = tk.Entry(self.root, textvariable=self.rgba, state='disabled', width=50)
+        rgba_entry.pack(pady=5)
 
         tk.Button(self.root, text="Set Overlay RGBA", command=self.set_rgba).pack(pady=10)
 
         tk.Label(self.root, text="Select File:").pack(pady=10)
 
-        entry_folder = tk.Entry(self.root, textvariable=self.folder_path, state='disabled', width=50)
+        entry_folder = tk.Entry(self.root, textvariable=self.file_path, state='disabled', width=20)
         entry_folder.pack(pady=5)
 
-        tk.Button(self.root, text="Browse", command=self.browse_folder).pack(pady=10)
-
-        #tk.Label(self.root, text="Select Type:").pack(pady=10)
-        #tk.Radiobutton(self.root, text="Image", variable=self.image_type, value="image", command=self.update_view).pack()
-        #tk.Radiobutton(self.root, text="Video", variable=self.image_type, value="video", command=self.update_view).pack()
+        tk.Button(self.root, text="Browse", command=self.browse_file).pack(pady=10)
 
         tk.Label(self.root, text="Select Image/Video:").pack(pady=10)
+
         tk.Radiobutton(self.root, text="Original", variable=self.selected_image_type, value="original",
                        command=self.update_view).pack()
         tk.Radiobutton(self.root, text="Overlay", variable=self.selected_image_type, value="overlay",
@@ -148,7 +138,7 @@ class ImageVideoViewer:
         tk.Radiobutton(self.root, text="Edges", variable=self.selected_image_type, value="edges",
                        command=self.update_view).pack()
 
-        tk.Button(self.root, text="Reset/Back", command=self.reset_view).pack(pady=20)
+        tk.Button(self.root, text="Predict!", command=self.predict).pack(pady=20)
 
         # Image/Video Display with Scrollbar
         self.canvas_frame = ttk.Frame(self.root)
@@ -163,23 +153,9 @@ class ImageVideoViewer:
 
         self.temp_image_path = None  # Track the temporary image path
 
-    def browse_folder(self):
-        og_file = filedialog.askopenfilename()
-        if og_file:
-            current_time = datetime.datetime.now()
-            #TODO: definetely better way to do this lol
-            run_name = str(current_time.year) + str(current_time.month) + str(current_time.day) + str(current_time.hour) + str(current_time.minute) + str(current_time.second)
-            os.makedirs(os.path.join("./cache/runs", run_name))
-            #TODO: make params changable
-            if og_file.endswith(".jpg"):
-                predict_image(self.model, og_file, os.path.join("./cache/runs", run_name), 30, False, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()))
-                self.image_type = "image"
-            elif og_file.endswith(".mp4"):
-                predict_video(self.model, og_file, os.path.join("./cache/runs", run_name), 30, False, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()), self.fps.get())
-                self.image_type = "video"
-        
-            self.folder_path.set(os.path.join("./cache/runs", run_name))
-            self.update_view()
+    def browse_file(self):
+        chosen_file = filedialog.askopenfilename()
+        self.file_path.set(chosen_file)
 
     def set_fps(self):
         chosen_fps = simpledialog.askinteger("FPS Entry", "Enter FPS")
@@ -188,20 +164,50 @@ class ImageVideoViewer:
     def set_rgba(self):
         chosen_r = simpledialog.askinteger("RGBA Entry", "Enter Red value (0 - 255)")
         self.r.set(chosen_r)
+
         chosen_g = simpledialog.askinteger("RGBA Entry", "Enter Green value (0 - 255)")
         self.g.set(chosen_g)
+
         chosen_b = simpledialog.askinteger("RGBA Entry", "Enter Blue value (0 - 255)")
         self.b.set(chosen_b)
+
         chosen_a = simpledialog.askinteger("RGBA Entry", "Enter Alpha value (0 - 255)")
         self.alpha.set(chosen_a)
 
+        self.rgba.set(", ".join(str(i) for i in [self.r.get(), self.g.get(), self.b.get(), self.alpha.get()]))
+
+    def predict(self):
+        file_path = self.file_path.get()
+
+        current_time = datetime.datetime.now()
+        #TODO: definetely better way to do this lol
+        run_name = str(current_time.year) + str(current_time.month) + str(current_time.day) + str(current_time.hour) + str(current_time.minute) + str(current_time.second)
+        os.makedirs(os.path.join("./cache/runs", run_name))
+        #TODO: make params changable
+
+        if file_path.endswith(".jpg"):
+            predict_image(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()))
+            self.image_type = "image"
+        elif file_path.endswith(".mp4"):
+            predict_video(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()), self.fps.get())
+            self.image_type = "video"
+    
+        self.folder_path.set(os.path.join("./cache/runs", run_name))
+        self.update_view()
+
     def update_view(self):
+        file_path = self.file_path.get()
         folder_path = self.folder_path.get()
+
         fps = self.fps.get()
+
         r = self.r.get()
         g = self.g.get()
         b = self.b.get()
+
         alpha = self.alpha.get()
+        self.rgba = value=", ".join(str(i) for i in [self.r.get(), self.g.get(), self.b.get(), self.alpha.get()])
+
         if not folder_path:
             return
 
@@ -237,7 +243,7 @@ class ImageVideoViewer:
 
         self.show_image(image_path)
 
-    def reset_view(self):
+    """def reset_view(self):
         self.folder_path.set("")
         self.image_type.set("image")
         self.selected_image_type.set("original")
@@ -246,9 +252,10 @@ class ImageVideoViewer:
         # Clean up the temporary image file
         if self.temp_image_path and os.path.exists(self.temp_image_path):
             os.remove(self.temp_image_path)
-            self.temp_image_path = None
+            self.temp_image_path = None"""
 
     def show_image(self, image_path):
+        self.canvas.delete("all")
         img = Image.open(image_path)
         img = ImageTk.PhotoImage(img)
         self.canvas.config(scrollregion=self.canvas.bbox("all"), width=img.width(), height=img.height())
@@ -256,7 +263,7 @@ class ImageVideoViewer:
         self.canvas.image = img
 
     def save_temp_image(self, image):
-        temp_path = "temp_image.jpg"
+        temp_path = os.path.join("cache", "temp_image.jpg")
         cv2.imwrite(temp_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         return temp_path
 
