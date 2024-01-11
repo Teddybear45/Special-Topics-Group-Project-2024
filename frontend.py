@@ -60,7 +60,10 @@ class VideoPlayer:
                 # Add a delay between frames (frame_delay is in milliseconds)
                 time.sleep(self.frame_delay / 1000)
             else:
-                self.is_playing = False
+                # self.is_playing = False
+
+                # Video has reached the end, rewind to the beginning
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
     def save_temp_image(self, image):
         temp_path = "temp_image.jpg"
@@ -69,6 +72,16 @@ class VideoPlayer:
 
     def show_frame(self, image_path):
         img = Image.open(image_path)
+
+        # Get the current window width
+        window_width = self.canvas.winfo_width()
+
+        # Calculate the scaling factor to fit the image into the window width
+        scale_factor = window_width / img.width
+
+        # Resize the image
+        img = img.resize((int(img.width * scale_factor), int(img.height * scale_factor)), Image.LANCZOS)
+
         img = ImageTk.PhotoImage(img)
         self.canvas.config(scrollregion=self.canvas.bbox("all"), width=img.width(), height=img.height())
         self.canvas.create_image(0, 0, anchor='nw', image=img)
@@ -155,7 +168,7 @@ class ImageVideoViewer:
             if hasattr(self, "video_player") and self.video_player.is_playing:
                 self.video_player.stop()
 
-            self.video_player = VideoPlayer(self.canvas, video_path, frame_delay=20)
+            self.video_player = VideoPlayer(self.canvas, video_path, frame_delay=1)
             self.video_player.start()
             return
 
