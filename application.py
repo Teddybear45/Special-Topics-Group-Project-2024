@@ -1,6 +1,11 @@
 import numpy as np
 import math
 import cv2
+import os
+from PIL import Image
+from predict import *
+import shutil
+from convert import frames_to_video
 
 def create_path_plan(
     mask: np.ndarray, # np binary mask input
@@ -14,58 +19,107 @@ def create_path_plan(
         max_y = height
 
     for i in range(max_y):
-        left_it = 0
-        right_it = width - 1
-        middle = -1
-
-        while left_it < width and mask[height - 1 - i][left_it] == 0:
-            left_it += 1
-        
-        while right_it >= 0 and mask[height - 1 - i][right_it] == 0:
-            right_it -= 1
-
-        if left_it <= right_it:
-            middle = int((left_it + right_it) / 2)
+        if np.size(np.where(mask[height - 1 - i] != 0)) != 0:
+            left = np.where(mask[height - 1 - i] != 0)[0][0]
+            right = np.where(mask[height - 1 - i] != 0)[0][-1]
+            middle = int((left + right) / 2)
             result[height - 1 - i][middle] = 1
     
     return result
 
-def viewable_path( # since path only have a width of exactly 1 you cant really see it for large images
-    mask: np.ndarray,
+def create_viewable_path( # since path only have a width of exactly 1 you cant really see it for large images
+    path: np.ndarray,
     output_path: str,
     r: int): # distance on either side of path horizontally to fill
 
-    result = np.copy(mask)
+    result = np.copy(path)
+    height, width = np.shape(path)
 
-    for row_idx, row in enumerate(mask):
-        for col_idx, value in enumerate(row):
-            if value == 0:
-                for i in range(max(0, col_idx - r), min(len(row), col_idx + r + 1)):
-                    if row[i] == 1:
-                        result[row_idx, col_idx] = 1
-                        break
-    
+    for i in range(height):
+        if np.size(np.where(path[i] != 0)) != 0:
+            point_idx = np.where(path[i] != 0)[0][0]
+            for j in range(max(0, point_idx - r), min(width - 1, point_idx + r)):
+                result[i][j] = 1
+
     cv2.imwrite(output_path, result * 255)
 
 def pred_move(
     path: np.ndarray,
     d_h: int): # how many pixels from the bottom to use as the point to go to
 
-    height, width = np.shape(mask)
+    height, width = np.shape(path)
     
     if d_h < 0 or d_h > height:
         d_h = height
 
     while d_h > 0 and not np.any(path[height - d_h] == 1):
         d_h -= 1
-        print(d_h)
 
-    d_v = np.where(path[height - d_h] == 1)[0] - width / 2
+    d_l = np.where(path[height - d_h] != 0)[0][0] - width / 2
+    return math.atan(d_l / d_h) * 360 / (2 * math.pi)
+
+def pred_move_photo(
+    run_path: str,
+    d_h: int,
+    r: int,
+    rgba: tuple
+):
+    mask = np.load(os.path.join(run_path, "mask.npy"))
+    path = create_path_plan(mask, d_h)
+    np.save(os.path.join(run_path, "path.npy"), path * 255)
+    create_viewable_path(path, os.path.join(run_path, "path.jpg"), r)
     
-    return math.atan(d_h / d_v) * 360 / (2 * math.pi)
+    overlay = Image.open(os.path.join(run_path, "path.jpg"))
 
+    overlay = overlay.convert("RGBA")
+    datas = overlay.getdata()
+
+    newData = []
+    for item in datas:
+        if item[0] == 0 and item[1] == 0 and item[2] == 0:
+            newData.append((0, 0, 0, 0))
+        else:
+            newData.append(rgba)
+
+    overlay.putdata(newData)
+
+    _, _, _, mask = overlay.split()
+
+    background = Image.open(os.path.join(run_path, "original.jpg"))
+    background.paste(overlay, (0, 0), mask)
+
+
+    background.save(os.path.join(run_path, "path_overlay.jpg"))
+
+    return pred_move(path, d_h)
+
+def pred_move_video(
+    run_path: str,
+    d_h: int,
+    r: int,
+    rgba: tuple,
+    fps: int
+):
+    frames_dir_list = os.listdir(os.path.join(run_path, "perframeruns/"))
+    frames_dir_list.sort()
+
+    os.makedirs(os.path.join(run_path, "framepaths"), exist_ok=True)
+    os.makedirs(os.path.join(run_path, "framepathoverlay"), exist_ok=True)
+    print(frames_dir_list)
+
+    angles = []
+
+    for i in frames_dir_list:
+        angles.append(pred_move_photo(os.path.join(run_path, "perframeruns", i), d_h, r, (rgba)))
+
+        shutil.copy(os.path.join(run_path, "perframeruns", i, "path.jpg"),
+                    os.path.join(run_path, "framepaths", i +  ".jpg"))
+        shutil.copy(os.path.join(run_path, "perframeruns", i, "path_overlay.jpg"),
+                    os.path.join(run_path, "framepathoverlay", i +  ".jpg"))
+        
+        frames_to_video(os.path.join(run_path, "framepaths"), os.path.join(run_path, "path.mp4"), fps)
+        frames_to_video(os.path.join(run_path, "framepathoverlay"), os.path.join(run_path, "path_overlay.mp4"), fps)
+    
 if __name__ == '__main__':
-    mask = cv2.imread("./toy.jpg", cv2.IMREAD_GRAYSCALE)
-    path = create_path_plan(mask, 32)
-    viewable_path(path, "./toy_result.jpg", 0)
-    print(pred_move(path, -1))
+    #print(pred_move_photo("./cache/runs/202422716219", 100, 10, (0, 255, 0, 100)))
+    print(pred_move_video("./cache/runs/2024228201325", -1, 10, (255, 0, 0, 100), 20))

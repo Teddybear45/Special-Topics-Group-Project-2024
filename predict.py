@@ -265,9 +265,6 @@ def predict_video_as_frames(model: YOLO, # must be absolute path, idk why
     #adjust original video framerate to match
     
     #cleanup
-    """shutil.rmtree(os.path.join(result_path, "framefolders"))
-    shutil.rmtree(os.path.join(result_path, "frames"))
-    shutil.rmtree(os.path.join(result_path, "perframeruns"))"""
 
 count = 0
 success = True
