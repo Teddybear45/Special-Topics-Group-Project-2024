@@ -95,7 +95,7 @@ def pred_move_photo(
 
 def pred_move_video(
     run_path: str,
-    d_h: int,
+    d_v: int,
     r: int,
     rgba: tuple,
     fps: int
@@ -110,7 +110,7 @@ def pred_move_video(
     angles = []
 
     for i in frames_dir_list:
-        angles.append(pred_move_photo(os.path.join(run_path, "perframeruns", i), d_h, r, (rgba)))
+        angles.append(pred_move_photo(os.path.join(run_path, "perframeruns", i), d_v, r, (rgba)))
 
         shutil.copy(os.path.join(run_path, "perframeruns", i, "path.jpg"),
                     os.path.join(run_path, "framepaths", i +  ".jpg"))
@@ -120,6 +120,7 @@ def pred_move_video(
         frames_to_video(os.path.join(run_path, "framepaths"), os.path.join(run_path, "path.mp4"), fps)
         frames_to_video(os.path.join(run_path, "framepathoverlay"), os.path.join(run_path, "path_overlay.mp4"), fps)
     
+    return angles
 if __name__ == '__main__':
     #print(pred_move_photo("./cache/runs/202422716219", 100, 10, (0, 255, 0, 100)))
     print(pred_move_video("./cache/runs/2024228201325", -1, 10, (255, 0, 0, 100), 20))
