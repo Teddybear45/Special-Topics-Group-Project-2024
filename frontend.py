@@ -7,7 +7,9 @@ import threading
 import time
 import datetime
 from ultralytics import YOLO
-from predict import predict_image, predict_video
+
+from application import pred_move_video
+from predict import predict_image, predict_video_as_frames
 
 class VideoPlayer:
     def __init__(self, video_path, fps=5):
@@ -45,7 +47,7 @@ class VideoPlayer:
 
     def save_temp_image(self, image):
         temp_path = "temp_image.jpg"
-        cv2.imwrite(temp_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(temp_path, cv2.cvtColor(image, 0))
         return temp_path
 
     def show_frame(self, image_path):
@@ -129,6 +131,7 @@ class ImageVideoViewer:
                        command=self.update_view).pack()
         tk.Radiobutton(self.root, text="Edges", variable=self.selected_image_type, value="edges",
                        command=self.update_view).pack()
+        tk.Radiobutton(self.root, text="Path", variable=self.selected_image_type, value="path", command=self.update_view).pack()
 
         tk.Button(self.root, text="Predict!", command=self.predict).pack(pady=20)
 
@@ -161,15 +164,20 @@ class ImageVideoViewer:
         current_time = datetime.datetime.now()
         run_name = str(current_time.year) + str(current_time.month) + str(current_time.day) + str(
             current_time.hour) + str(current_time.minute) + str(current_time.second)
-        os.makedirs(os.path.join("./cache/runs", run_name))
+
+        cache_run_path = os.path.join("./cache/runs", run_name)
+        os.makedirs(cache_run_path)
 
         if file_path.endswith(".jpg"):
             predict_image(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False,
                           (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()))
             self.image_type = "image"
         elif file_path.endswith(".mp4"):
-            predict_video(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False,
+            predict_video_as_frames(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False,
                           (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()), self.fps.get())
+
+            angles = pred_move_video(cache_run_path, -1, 15, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()), self.fps.get())
+
             self.image_type = "video"
 
         self.folder_path.set(os.path.join("./cache/runs", run_name))
@@ -223,6 +231,12 @@ class ImageVideoViewer:
                 # set the video path to the temp video file
                 video_path = binary_mask_video_of_edges # TODO
 
+            elif selected_type == "path":
+                video_path = f"{folder_path}/path_overlay.mp4"
+
+
+
+
             # if hasattr(self, "video_player") and self.video_player.is_playing:
             #     self.video_player.stop()
 
@@ -248,7 +262,7 @@ class ImageVideoViewer:
 
     def save_temp_image(self, image):
         temp_path = os.path.join("cache", "temp_image.jpg")
-        cv2.imwrite(temp_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(temp_path, cv2.cvtColor(image, 0))
         return temp_path
 
 if __name__ == "__main__":
