@@ -1,29 +1,3 @@
-
-
-# Premise
-# gui using Tkinter that will have a button for selecting the folder for the results. Below that, there's a radio button that asks whether it's image or video format
-
-# for image, the directory chosen will have this structure:
-# original.jpg (or jpeg)
-# overlay.jpg (or jpeg)
-# edges.jpg (or jpeg)
-
-# for this, show the original image. then, on the right side have a radio check that will allow the user to select which image to show (original, overlay, edges)
-# for the edges, we need to do some calculations wherein the white (255) pixels are the edges. we can do this by taking the difference between the original and the overlay,
-# \ and then thresholding it at 0. this will give us a binary image where the edges are white and the rest is black. we can then display this image if that's the selection
-
-# for video, the directory chosen will have this structure:
-# original.mp4
-# overlay.mp4
-
-# for this, show the original video. then, on the right side have a radio check that will allow the user to select which video to show (original, overlay)
-
-
-
-# finally, there should be a reset/back button to choose a new directory
-
-# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, simpledialog
@@ -32,63 +6,79 @@ from PIL import Image, ImageTk
 import threading
 import time
 import datetime
-import tkinter as tk
 from ultralytics import YOLO
 from predict import predict_image, predict_video
 
-
 class VideoPlayer:
-    def __init__(self, canvas, video_path, fps=5):
-        self.canvas = canvas
+    def __init__(self, video_path, fps=5):
         self.video_path = video_path
         self.cap = cv2.VideoCapture(video_path)
-        self.thread = threading.Thread(target=self.update, daemon=True)
+        self.window = tk.Toplevel()
+        self.canvas = tk.Canvas(self.window)
+        self.canvas.pack()
         self.is_playing = False
-        self.frame_delay = 1.0/fps  # Set the frame delay in milliseconds
+        self.frame_delay = 1.0 / fps  # Set the frame delay in milliseconds
 
     def start(self):
         self.is_playing = True
-        self.thread.start()
+        self.update()
 
     def stop(self):
         self.is_playing = False
         self.cap.release()
+        self.window.destroy()
+
+    def restart_in_same_window(self):
+        self.cap = cv2.VideoCapture(self.video_path)
+        self.update()
 
     def update(self):
-        while self.is_playing:
-            ret, frame = self.cap.read()
-            if ret:
-                image_path = self.save_temp_image(frame)
-                self.show_frame(image_path)
-                # Add a delay between frames (frame_delay is in milliseconds)
-                time.sleep(self.frame_delay)
-            else:
-                # self.is_playing = False
+        ret, frame = self.cap.read()
+        if ret:
+            image_path = self.save_temp_image(frame)
+            self.show_frame(image_path)
+            self.window.after(int(self.frame_delay * 1000), self.update)
+        else:
+            # self.stop() # TODO
+            self.restart_in_same_window()
 
-                # Video has reached the end, rewind to the beginning
-                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
     def save_temp_image(self, image):
         temp_path = "temp_image.jpg"
-        cv2.imwrite(temp_path, cv2.cvtColor(image, 0))
+        cv2.imwrite(temp_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         return temp_path
 
     def show_frame(self, image_path):
         img = Image.open(image_path)
 
-        # Get the current window width
-        window_width = self.canvas.winfo_width()
+        # Get the size of the canvas
+        # make the canvas size proportional to the image size but have it be a fixed 800px width
 
-        # Calculate the scaling factor to fit the image into the window width
-        scale_factor = window_width / img.width
+        canvas_width = 800
+        canvas_height = int(img.height * (canvas_width / img.width))
 
-        # Resize the image
-        img = img.resize((int(img.width * scale_factor), int(img.height * scale_factor)), Image.LANCZOS)
+        # Resize the image to fit the canvas
+        img = img.resize((canvas_width, canvas_height))
 
         img = ImageTk.PhotoImage(img)
-        self.canvas.config(scrollregion=self.canvas.bbox("all"), width=img.width(), height=img.height())
+
+        # Clear previous content on the canvas
+        self.canvas.delete("all")
+
+        # Display the resized image on the canvas
+        # have the width and heigh of the canvas be proportional to the width and height of the image; but have it be a fixed 800px width
+        # self.canvas.config(scrollregion=self.canvas.bbox("all"), width=img.width(), height=img.height())
+        self.canvas.config(scrollregion=self.canvas.bbox("all"), width=canvas_width, height=canvas_height)
         self.canvas.create_image(0, 0, anchor='nw', image=img)
         self.canvas.image = img
+
+
+        # img = ImageTk.PhotoImage(img)
+        # self.canvas.config(width=img.width(), height=img.height())
+        # self.canvas.create_image(0, 0, anchor='nw', image=img)
+        # self.canvas.image = img
+
+
 
 class ImageVideoViewer:
     def __init__(self, root):
@@ -100,14 +90,16 @@ class ImageVideoViewer:
         self.folder_path = tk.StringVar()
         self.image_type = "image"
         self.selected_image_type = tk.StringVar(value="original")
-        
-        self.model = YOLO("/Users/nathansun/Documents/Special-Topics-Group-Project-2024/best.pt")
+
+        self.model = YOLO("/Users/teddybear/PycharmProjects/Special-Topics-Group-Project-2024/best-1.pt")
         self.fps = tk.IntVar(self.root, 5)
         self.r = tk.IntVar(self.root, 255)
         self.g = tk.IntVar(self.root, 100)
         self.b = tk.IntVar(self.root, 100)
         self.alpha = tk.IntVar(self.root, 100)
         self.rgba = tk.StringVar(value=", ".join(str(i) for i in [self.r.get(), self.g.get(), self.b.get(), self.alpha.get()]))
+
+        self.temp_image_path = None
 
         # GUI Components
         tk.Label(self.root, text="Select FPS:").pack(pady=10)
@@ -140,19 +132,6 @@ class ImageVideoViewer:
 
         tk.Button(self.root, text="Predict!", command=self.predict).pack(pady=20)
 
-        # Image/Video Display with Scrollbar
-        self.canvas_frame = ttk.Frame(self.root)
-        self.canvas_frame.pack(expand=True, fill='both')
-
-        self.canvas = tk.Canvas(self.canvas_frame)
-        self.canvas.pack(side='left', expand=True, fill='both')
-
-        scrollbar = ttk.Scrollbar(self.canvas_frame, orient='vertical', command=self.canvas.yview)
-        scrollbar.pack(side='right', fill='y')
-        self.canvas.configure(yscrollcommand=scrollbar.set)
-
-        self.temp_image_path = None  # Track the temporary image path
-
     def browse_file(self):
         chosen_file = filedialog.askopenfilename()
         self.file_path.set(chosen_file)
@@ -180,18 +159,19 @@ class ImageVideoViewer:
         file_path = self.file_path.get()
 
         current_time = datetime.datetime.now()
-        #TODO: definetely better way to do this lol
-        run_name = str(current_time.year) + str(current_time.month) + str(current_time.day) + str(current_time.hour) + str(current_time.minute) + str(current_time.second)
+        run_name = str(current_time.year) + str(current_time.month) + str(current_time.day) + str(
+            current_time.hour) + str(current_time.minute) + str(current_time.second)
         os.makedirs(os.path.join("./cache/runs", run_name))
-        #TODO: make params changable
 
         if file_path.endswith(".jpg"):
-            predict_image(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()))
+            predict_image(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False,
+                          (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()))
             self.image_type = "image"
         elif file_path.endswith(".mp4"):
-            predict_video(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False, (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()), self.fps.get())
+            predict_video(self.model, file_path, os.path.join("./cache/runs", run_name), 30, False,
+                          (self.r.get(), self.g.get(), self.b.get(), self.alpha.get()), self.fps.get())
             self.image_type = "video"
-    
+
         self.folder_path.set(os.path.join("./cache/runs", run_name))
         self.update_view()
 
@@ -234,33 +214,37 @@ class ImageVideoViewer:
             if selected_type == "overlay":
                 video_path = f"{folder_path}/overlay.mp4"
 
-            if hasattr(self, "video_player") and self.video_player.is_playing:
-                self.video_player.stop()
+            elif selected_type == "edges":
+                original_video = cv2.VideoCapture(f"{folder_path}/original.mp4")
+                binary_mask_video_of_edges = cv2.VideoCapture(f"{folder_path}/edges.mp4")
 
-            self.video_player = VideoPlayer(self.canvas, video_path, fps=fps)
+                # for every frame in the orginal video, overlay the binary mask with the mask color
+                # save the frames to a temp video file
+                # set the video path to the temp video file
+                video_path = binary_mask_video_of_edges # TODO
+
+            # if hasattr(self, "video_player") and self.video_player.is_playing:
+            #     self.video_player.stop()
+
+            # have it loop, actually: TODO
+
+
+            self.video_player = VideoPlayer(video_path, fps=fps)
             self.video_player.start()
             return
 
         self.show_image(image_path)
 
-    """def reset_view(self):
-        self.folder_path.set("")
-        self.image_type.set("image")
-        self.selected_image_type.set("original")
-        self.canvas.delete("all")
-
-        # Clean up the temporary image file
-        if self.temp_image_path and os.path.exists(self.temp_image_path):
-            os.remove(self.temp_image_path)
-            self.temp_image_path = None"""
-
     def show_image(self, image_path):
-        self.canvas.delete("all")
+        window = tk.Toplevel()
+        canvas = tk.Canvas(window)
+        canvas.pack()
+
         img = Image.open(image_path)
         img = ImageTk.PhotoImage(img)
-        self.canvas.config(scrollregion=self.canvas.bbox("all"), width=img.width(), height=img.height())
-        self.canvas.create_image(0, 0, anchor='nw', image=img)
-        self.canvas.image = img
+        canvas.config(scrollregion=canvas.bbox("all"), width=img.width(), height=img.height())
+        canvas.create_image(0, 0, anchor='nw', image=img)
+        canvas.image = img
 
     def save_temp_image(self, image):
         temp_path = os.path.join("cache", "temp_image.jpg")
@@ -271,6 +255,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = ImageVideoViewer(root)
     root.mainloop()
-
-
-
