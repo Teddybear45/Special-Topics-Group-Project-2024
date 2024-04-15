@@ -4,6 +4,7 @@ import cv2
 import os
 import shutil
 from PIL import Image
+import time
 from convert import label_to_mask, video_to_frames, frames_to_video
 
 # functions create a folder with the following:
@@ -30,21 +31,22 @@ def predict_image(model: YOLO, # must be absolute path, idk why
     #extracts the coordinates from the ultralytics result obj
     result_obj = result_obj[0]
     ultralytics_mask = result_obj.masks
+    print(ultralytics_mask)
     if ultralytics_mask is not None:
-        coords = ultralytics_mask.xyn
+            coords = ultralytics_mask.xyn
+             # get first and only prediction, adds to flattened list
+            coords = np.array(coords)[0]
+            flattened_coords = [0] #class index for label format
+
+            for pair in coords:
+                for value in pair:
+                    flattened_coords.append(value)
+            
+            formatted_string = ' '.join(map(str, flattened_coords))
     else:
-        coords = [[]]
-
-    # get first and only prediction, adds to flattened list
-    coords = np.array(coords)[0]
-    flattened_coords = [0] #class index for label format
-
-    for pair in coords:
-        for value in pair:
-            flattened_coords.append(value)
+        formatted_string = '0'
 
     #converts to string
-    formatted_string = ' '.join(map(str, flattened_coords))
     with open(os.path.join(result_path, "coords.txt"), 'w') as label_file:
         label_file.write(formatted_string)
 
@@ -97,18 +99,21 @@ def predict_image(model: YOLO, # must be absolute path, idk why
         else:
             newData.append(rgba)
 
-    #saves the new data to the overlay image
-    overlay.putdata(newData)
+    if ultralytics_mask is not None:
+        #saves the new data to the overlay image
+        overlay.putdata(newData)
 
-    #mask for pasting overlay onto the background (og image)
-    _, _, _, mask = overlay.split()
+        #mask for pasting overlay onto the background (og image)
+        _, _, _, mask = overlay.split()
 
-    #opens background and pastes overlay on
-    background = Image.open(os.path.join(result_path, "original.jpg"))
-    background.paste(overlay, (0, 0), mask)
+        #opens background and pastes overlay on
+        background = Image.open(os.path.join(result_path, "original.jpg"))
+        background.paste(overlay, (0, 0), mask)
 
-    #saves new image (background + overlay) as overlay.jpg
-    background.save(os.path.join(result_path, "overlay.jpg"))
+        #saves new image (background + overlay) as overlay.jpg
+        background.save(os.path.join(result_path, "overlay.jpg"))
+    else:
+        shutil.copyfile(os.path.join(result_path, "original.jpg"), os.path.join(result_path, "overlay.jpg"))
 
 def predict_images_batch(model: YOLO,
                           image_paths: list, # path to original image
@@ -132,19 +137,20 @@ def predict_images_batch(model: YOLO,
         ultralytics_mask = result_obj.masks
         if ultralytics_mask is not None:
             coords = ultralytics_mask.xyn
+             # get first and only prediction, adds to flattened list
+            coords = np.array(coords)[0]
+            flattened_coords = [0] #class index for label format
+
+            for pair in coords:
+                for value in pair:
+                    flattened_coords.append(value)
+            
+            formatted_string = ' '.join(map(str, flattened_coords))
         else:
-            coords = [[]]
-
-        # get first and only prediction, adds to flattened list
-        coords = np.array(coords)[0]
-        flattened_coords = [0] #class index for label format
-
-        for pair in coords:
-            for value in pair:
-                flattened_coords.append(value)
+            formatted_string = '0'
 
         #converts to string
-        formatted_string = ' '.join(map(str, flattened_coords))
+        
         with open(os.path.join(result_path, "coords.txt"), 'w') as label_file:
             label_file.write(formatted_string)
 
@@ -197,18 +203,21 @@ def predict_images_batch(model: YOLO,
             else:
                 newData.append(rgba)
 
-        #saves the new data to the overlay image
-        overlay.putdata(newData)
+        if ultralytics_mask is not None:
+            #saves the new data to the overlay image
+            overlay.putdata(newData)
 
-        #mask for pasting overlay onto the background (og image)
-        _, _, _, mask = overlay.split()
+            #mask for pasting overlay onto the background (og image)
+            _, _, _, mask = overlay.split()
 
-        #opens background and pastes overlay on
-        background = Image.open(os.path.join(result_path, "original.jpg"))
-        background.paste(overlay, (0, 0), mask)
+            #opens background and pastes overlay on
+            background = Image.open(os.path.join(result_path, "original.jpg"))
+            background.paste(overlay, (0, 0), mask)
 
-        #saves new image (background + overlay) as overlay.jpg
-        background.save(os.path.join(result_path, "overlay.jpg"))
+            #saves new image (background + overlay) as overlay.jpg
+            background.save(os.path.join(result_path, "overlay.jpg"))
+        else:
+            shutil.copyfile(os.path.join(result_path, "original.jpg"), os.path.join(result_path, "overlay.jpg"))
 
         ind += 1
 
@@ -241,12 +250,19 @@ def predict_video_as_frames(model: YOLO, # must be absolute path, idk why
     destination_list = [os.path.join(result_path, "perframeruns", i.replace(".png", "")) for i in frames_dir_list]
     
 
-    predict_images_batch(model,
+    """predict_images_batch(model,
                          source_list,
                          destination_list,
                          edges_width,
                          overlay_edges,
-                         rgba)
+                         rgba)"""
+    for i in frames_dir_list:
+        predict_image(model,
+                      os.path.join(result_path, "frames", i),
+                      os.path.join(result_path, "perframeruns", i.replace(".png", "")),
+                      edges_width,
+                      overlay_edges,
+                      rgba)
     for i in frames_dir_list:
         shutil.copy(os.path.join(result_path, "perframeruns", i.replace(".png", ""), "original.jpg"),
                     os.path.join(result_path, "framefolders/originals", i.replace(".png", ".jpg")))
@@ -269,20 +285,30 @@ def predict_video_as_frames(model: YOLO, # must be absolute path, idk why
 count = 0
 success = True
 if __name__ == "__main__":
-    model = YOLO("/Users/nathansun/Documents/Special-Topics-Group-Project-2024/best.pt")
+    model = YOLO("/Users/nathansun/Documents/Special-Topics-Group-Project-2024.nosync/best.pt")
     """predict_image(model,
                   "./roadpic.jpg",
                   "./predicttest",
                   30,
                   False,
                   (100, 100, 255, 100))"""
+    """t0 = time.time()
     predict_video_as_frames(model,
                   "./testvid.mp4",
                   "./vidtest",
-                  30,
+                  60,
                   False,
                   (100, 255, 100, 100),
                   10)
+    t1 = time.time()
+    total = t1-t0
+    print(total)"""
+    predict_image(model,
+                  "./toy.jpg",
+                  "./emptyresult",
+                  20,
+                  False,
+                  (255, 0, 0, 100))
     """predict_images_batch(
         model,
         [os.path.join("./batch_test", i) for i in os.listdir("./batch_test")],

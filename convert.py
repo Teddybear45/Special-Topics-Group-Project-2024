@@ -110,6 +110,7 @@ def label_to_mask_dir(input_dir: str, output_dir: str, mask_size: tuple, as_nump
     #TODO: figure out why -1 in length
     print("converted " + str(len([i.endswith(".txt") for i in os.listdir(input_dir)]) - 1) + " labels in " + input_dir + " to masks in " + output_dir)
     print("")
+    
 
 def video_to_frames(video_path: str, output_dir: str, fps: int):
     
@@ -161,4 +162,7 @@ def frames_to_video(images_dir: str, output_video_path: str, fps: int):
 
     
 if __name__ == "__main__":
-    print(get_polygon_coords("/Users/nathansun/Documents/Special-Topics-Group-Project-2024/emptytest.txt"))
+    label_to_mask("/Users/nathansun/Documents/Special-Topics-Group-Project-2024.nosync/100 Images/test/labels/Screenshot-2023-11-28-at-10-26-16-PM_png.rf.3334628ce0694b6c8ce163e12da04e8e.txt",
+                  "./demoMask.jpg",
+                  (400, 600),
+                  True)

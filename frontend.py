@@ -93,7 +93,7 @@ class ImageVideoViewer:
         self.image_type = "image"
         self.selected_image_type = tk.StringVar(value="original")
 
-        self.model = YOLO("/Users/teddybear/PycharmProjects/Special-Topics-Group-Project-2024/best-1.pt")
+        self.model = YOLO("/Users/nathansun/Documents/Special-Topics-Group-Project-2024.nosync/best.pt")
         self.fps = tk.IntVar(self.root, 5)
         self.r = tk.IntVar(self.root, 255)
         self.g = tk.IntVar(self.root, 100)

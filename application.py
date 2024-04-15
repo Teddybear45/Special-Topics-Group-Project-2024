@@ -55,6 +55,9 @@ def pred_move(
     while d_h > 0 and not np.any(path[height - d_h] == 1):
         d_h -= 1
 
+    if d_h == 0:
+        return 0
+
     d_l = np.where(path[height - d_h] != 0)[0][0] - width / 2
     return math.atan(d_l / d_h) * 360 / (2 * math.pi)
 
@@ -121,6 +124,12 @@ def pred_move_video(
         frames_to_video(os.path.join(run_path, "framepathoverlay"), os.path.join(run_path, "path_overlay.mp4"), fps)
     
     return angles
+
+# def pred_move_fast(frame) {
+    
+# }
+
 if __name__ == '__main__':
     #print(pred_move_photo("./cache/runs/202422716219", 100, 10, (0, 255, 0, 100)))
-    print(pred_move_video("./cache/runs/2024228201325", -1, 10, (255, 0, 0, 100), 20))
+    #print(pred_move_video("./cache/runs/2024228201325", -1, 10, (255, 0, 0, 100), 20))
+    pred_move_photo("./demoresult", -1, 10, (255, 255, 255, 255))
