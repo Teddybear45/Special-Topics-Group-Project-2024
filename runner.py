@@ -3,6 +3,10 @@ import tkinter as tk
 
 import numpy as np
 
+
+from pynput.keyboard import Key, Controller
+
+
 # start the root tk
 def lazy_run():
     root = tk.Tk()
@@ -34,17 +38,29 @@ def lazy_run():
 
 # frame by frame in: [bool, bool, bool, bool] (up, down, left, right)
 def lazy_realtime_direction(root, canvas, dirs1d: np.ndarray):
+    keyboard = Controller()
+
     # clear the liens
     canvas.delete("all")
     # if the bool is true, then show the arrow, else remove it
     if dirs1d[0]:
         canvas.create_line(100, 100, 100, 50, arrow=tk.LAST)
+        keyboard.press(Key.up)
+        keyboard.release(Key.up)
+
     if dirs1d[1]:
         canvas.create_line(100, 100, 100, 150, arrow=tk.LAST)
+        keyboard.press(Key.down)
+        keyboard.release(Key.down)
+
     if dirs1d[2]:
         canvas.create_line(100, 100, 50, 100, arrow=tk.LAST)
+        keyboard.press(Key.left)
+        keyboard.release(Key.left)
     if dirs1d[3]:
         canvas.create_line(100, 100, 150, 100, arrow=tk.LAST)
+        keyboard.press(Key.right)
+        keyboard.release(Key.right)
 
 
     root.update()

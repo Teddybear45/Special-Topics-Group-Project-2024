@@ -86,8 +86,13 @@ def lazy_realtime_direction(root, canvas, dirs1d: np.ndarray):
 
     root.update()
 
-def main():
-    model = YOLO("/Users/nathansun/Documents/Special-Topics-Group-Project-2024.nosync/best.pt")
+def main(*args):
+    # take in argument for the path to the model
+    default_model = "/Users/nathansun/Documents/Special-Topics-Group-Project-2024.nosync/best.pt"
+
+
+    # model = YOLO(args[0]) if os.path.exists(args[0]) and len(args) == 1 else YOLO(default_model)
+    model = YOLO(default_model)
 
     # running the arrow interface window
     root = tk.Tk()
